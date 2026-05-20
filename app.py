@@ -23,6 +23,37 @@ with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
 contract = web3.eth.contract(address=CONTRACT_ADDRESS, abi=contract_abi)
 web3.eth.default_account = web3.eth.accounts[0]
 
+HISTORY_FILE = 'history.json'
+
+# ==========================================
+# FUNGSI MANAJEMEN RIWAYAT (JSON LOKAL)
+# ==========================================
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename):
+    history = load_history()
+    # Pastikan format data berupa list
+    if not isinstance(history, list):
+        history = []
+    
+    new_entry = {
+        "nama_file": filename,
+        "ciphertext": ciphertext_hex,
+        "sha_256": doc_hash,
+        "tx_hash": tx_hash,
+        "enc_filename": enc_filename
+    }
+    history.append(new_entry)
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history, f, indent=4)
+
 # ==========================================
 # FUNGSI UTAMA TWOFISH
 # ==========================================
@@ -40,6 +71,10 @@ def unpad_data(data):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    return jsonify(load_history())
 
 @app.route('/api/encrypt', methods=['POST'])
 def api_encrypt():
@@ -74,6 +109,9 @@ def api_encrypt():
 
         ciphertext_full = ciphertext.hex().upper()
 
+        # Simpan ke log riwayat lokal
+        save_to_history(file.filename, ciphertext_full, hash_ciphertext, tx_receipt.transactionHash.hex(), enc_filename)
+
         return jsonify({
             "status": "success",
             "message": "Dokumen berhasil dienkripsi dan dikunci di Blockchain",
@@ -95,15 +133,12 @@ def api_decrypt():
         key_string = request.form['key']
         ciphertext = file.read()
 
-        # 1. Hitung Hash Ciphertext
         hash_ciphertext = hashlib.sha256(ciphertext).hexdigest()
 
-        # 2. Verifikasi Hash ke Blockchain Ganache
         is_exist = contract.functions.verifyDocument(hash_ciphertext).call()
         if not is_exist:
              return jsonify({"status": "error", "message": "DOKUMEN PALSU! Tidak terdaftar di Blockchain."}), 400
 
-        # 3. Dekripsi dengan Twofish
         key_bytes = key_string.encode('utf-8').ljust(32, b'\0')[:32]
         T = Twofish(key_bytes)
         
@@ -113,11 +148,9 @@ def api_decrypt():
             
         plaintext = unpad_data(plaintext_padded)
 
-        # 4. Verifikasi Format PDF (Keamanan Tambahan)
         if not plaintext.startswith(b'%PDF-'):
             return jsonify({"status": "error", "message": "Kunci Salah atau File Rusak!"}), 400
 
-        # 5. Simpan dan Berikan Akses Unduh
         dec_filename = f"asli_{file.filename.replace('.enc', '.pdf')}"
         dec_filepath = os.path.join('decrypted', dec_filename)
         with open(dec_filepath, 'wb') as f:

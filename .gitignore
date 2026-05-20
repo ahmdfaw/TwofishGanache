@@ -49,3 +49,6 @@ encrypted/
 # Optional: git-lfs-managed patterns (if using LFS for large files)
 # *.pdf
 # *.zip
+
+# Project history
+history.json
