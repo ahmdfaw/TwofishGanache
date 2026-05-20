@@ -13,7 +13,7 @@ app = Flask(__name__)
 ganache_url = "http://127.0.0.1:7545"
 web3 = Web3(Web3.HTTPProvider(ganache_url))
 
-# TODO: MASUKKAN CONTRACT ADDRESS DARI TRUFFLE MIGRATE
+# CONTRACT ADDRESS DARI TRUFFLE MIGRATE
 CONTRACT_ADDRESS = "0xd60e68381c1D6Ab012AA4fD409E6D049c90a6945" 
 
 with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
@@ -95,9 +95,20 @@ def api_encrypt():
         key_bytes = derive_key_sha256(key_string)
         T = Twofish(key_bytes)
         padded_data = pad_data(file_bytes)
-        ciphertext = b''
+        
+        # --- IMPLEMENTASI MODE CBC (ENKRIPSI) ---
+        iv = os.urandom(16) # Pembuatan Initialization Vector
+        ciphertext = iv     # Simpan IV di awal file
+        prev_block = iv
+        
         for i in range(0, len(padded_data), 16):
-            ciphertext += T.encrypt(padded_data[i:i+16])
+            pt_block = padded_data[i:i+16]
+            # Operasi XOR: Mengaduk plaintext dengan blok sebelumnya
+            xored_block = bytes(a ^ b for a, b in zip(pt_block, prev_block))
+            ct_block = T.encrypt(xored_block)
+            ciphertext += ct_block
+            prev_block = ct_block
+        # ----------------------------------------
 
         hash_ciphertext = hashlib.sha256(ciphertext).hexdigest()
 
@@ -137,9 +148,9 @@ def api_decrypt():
             
         file = request.files['file']
         key_string = request.form['key']
-        ciphertext = file.read()
+        full_ciphertext = file.read() # Membaca seluruh file termasuk IV
 
-        hash_ciphertext = hashlib.sha256(ciphertext).hexdigest()
+        hash_ciphertext = hashlib.sha256(full_ciphertext).hexdigest()
 
         is_exist = contract.functions.verifyDocument(hash_ciphertext).call()
         if not is_exist:
@@ -148,9 +159,20 @@ def api_decrypt():
         key_bytes = derive_key_sha256(key_string)
         T = Twofish(key_bytes)
         
+        # --- IMPLEMENTASI MODE CBC (DEKRIPSI) ---
+        iv = full_ciphertext[:16] # Pisahkan IV dari 16 byte pertama
+        actual_ciphertext = full_ciphertext[16:]
+        prev_block = iv
+        
         plaintext_padded = b''
-        for i in range(0, len(ciphertext), 16):
-            plaintext_padded += T.decrypt(ciphertext[i:i+16])
+        for i in range(0, len(actual_ciphertext), 16):
+            ct_block = actual_ciphertext[i:i+16]
+            decrypted_block = T.decrypt(ct_block)
+            # Operasi XOR: Mengembalikan adukan untuk mendapat plaintext asli
+            pt_block = bytes(a ^ b for a, b in zip(decrypted_block, prev_block))
+            plaintext_padded += pt_block
+            prev_block = ct_block
+        # ----------------------------------------
             
         plaintext = unpad_data(plaintext_padded)
 
