@@ -65,6 +65,12 @@ def unpad_data(data):
     padding_len = data[-1]
     return data[:-padding_len]
 
+def derive_key_sha256(password: str) -> bytes:
+    """Derivasi kunci 32-byte dari password menggunakan SHA-256."""
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+    return hashlib.sha256(password).digest()
+
 # ==========================================
 # RUTE API (FLASK ENDPOINTS)
 # ==========================================
@@ -86,7 +92,7 @@ def api_encrypt():
         key_string = request.form['key']
         file_bytes = file.read()
 
-        key_bytes = key_string.encode('utf-8').ljust(32, b'\0')[:32]
+        key_bytes = derive_key_sha256(key_string)
         T = Twofish(key_bytes)
         padded_data = pad_data(file_bytes)
         ciphertext = b''
@@ -139,7 +145,7 @@ def api_decrypt():
         if not is_exist:
              return jsonify({"status": "error", "message": "DOKUMEN PALSU! Tidak terdaftar di Blockchain."}), 400
 
-        key_bytes = key_string.encode('utf-8').ljust(32, b'\0')[:32]
+        key_bytes = derive_key_sha256(key_string)
         T = Twofish(key_bytes)
         
         plaintext_padded = b''
