@@ -1,0 +1,51 @@
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+*.secret
+*.key
+*.pem
+
+# Logs / DB
+*.log
+*.sqlite3
+
+# Project-specific: blockchain/truffle build artifacts
+blockchain/build/
+blockchain/build/contracts/
+
+# Test / temp
+*.tmp
+*.bak
+
+# Sensitive / large data
+decrypted/
+encrypted/
+*.enc
+*.pdf
+
+# Optional: git-lfs-managed patterns (if using LFS for large files)
+# *.pdf
+# *.zip

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pengamanan Dokumen Akademik</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0b1426;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', sans-serif;
+            padding-top: 3vh;
+            padding-bottom: 5vh;
+        }
+
+        .nav-tabs {
+            border-bottom: 2px solid #1e2d4a;
+            margin-bottom: 20px;
+        }
+
+        .nav-tabs .nav-link {
+            color: #94a3b8;
+            border: none;
+            font-weight: 600;
+            padding: 12px 20px;
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: transparent;
+            color: #00c2cb;
+            border-bottom: 3px solid #00c2cb;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: #00c2cb;
+        }
+
+        .card-custom {
+            background-color: #152238;
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            height: 100%;
+        }
+
+        .card-header-cyan {
+            background-color: #00c2cb;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 15px 20px;
+        }
+
+        .card-header-green {
+            background-color: #61c454;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 15px 20px;
+        }
+
+        .card-header-purple {
+            background-color: #8b5cf6;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 15px 20px;
+        }
+
+        .card-body-custom {
+            padding: 30px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            background-color: #1e2d4a;
+            border: 1px solid #2d3f5f;
+            color: #f8fafc;
+            padding: 12px;
+        }
+
+        .form-control:focus {
+            background-color: #1e2d4a;
+            color: #f8fafc;
+            border-color: #00c2cb;
+            box-shadow: 0 0 0 0.2rem rgba(0, 194, 203, 0.25);
+        }
+
+        .input-group-text {
+            background-color: #1e2d4a;
+            border: 1px solid #2d3f5f;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .btn-cyan {
+            background-color: #00c2cb;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            margin-top: 20px;
+        }
+
+        .btn-cyan:hover {
+            background-color: #00a1a8;
+            color: white;
+        }
+
+        .btn-purple {
+            background-color: #8b5cf6;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            margin-top: 20px;
+        }
+
+        .btn-purple:hover {
+            background-color: #7c3aed;
+            color: white;
+        }
+
+        .btn-download {
+            background-color: #f59e0b;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 10px 20px;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 15px;
+        }
+
+        .btn-download:hover {
+            background-color: #d97706;
+            color: white;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #475a7b;
+            text-align: center;
+        }
+
+        .empty-state i {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+        }
+
+        .result-box {
+            background-color: #0b1426;
+            padding: 15px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            margin-bottom: 15px;
+            border: 1px solid #2d3f5f;
+        }
+
+        .text-muted-custom {
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h3 class="text-center mb-4"><i class="fa-solid fa-shield-halved text-info me-2"></i> Sistem Keamanan Dokumen
+        </h3>
+
+        <ul class="nav nav-tabs justify-content-center" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="enc-tab" data-bs-toggle="tab" data-bs-target="#enc-pane"
+                    type="button" role="tab">Enkripsi & Simpan</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dec-tab" data-bs-toggle="tab" data-bs-target="#dec-pane" type="button"
+                    role="tab">Verifikasi & Dekripsi</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active" id="enc-pane" role="tabpanel">
+                <div class="row g-4 align-items-stretch">
+                    <div class="col-md-6">
+                        <div class="card-custom">
+                            <div class="card-header-cyan"><i class="fa-solid fa-lock me-2"></i> Enkripsi Twofish</div>
+                            <div class="card-body-custom">
+                                <form id="encryptForm">
+                                    <div class="mb-4">
+                                        <label class="form-label">Pilih File PDF</label>
+                                        <input class="form-control" type="file" id="fileInput" accept=".pdf" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">Kunci Enkripsi</label>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control" id="keyInput" required>
+                                            <span class="input-group-text toggle-pwd"><i
+                                                    class="fa-solid fa-eye"></i></span>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn-cyan" id="btnSubmit"><i
+                                            class="fa-solid fa-lock me-2"></i> Enkripsi File</button>
+
+                                    <div id="ciphertextContainer" class="mt-4 d-none">
+                                        <label class="form-label text-warning"><i
+                                                class="fa-solid fa-file-code me-2"></i>Hasil Ciphertext Keseluruhan
+                                            (Hex):</label>
+                                        <textarea id="fullCiphertextOutput" class="form-control" rows="7" readonly
+                                            style="font-family: monospace; font-size: 0.8rem; background-color: #050b14; color: #fbbf24; border: 1px solid #334155; resize: none;"></textarea>
+                                        <div class="text-muted-custom mt-1" style="font-size: 0.75rem;">*Scroll ke dalam
+                                            kotak untuk melihat seluruh baris teks.</div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card-custom">
+                            <div class="card-header-green"><i class="fa-solid fa-link me-2"></i> Status Blockchain</div>
+                            <div class="card-body-custom" id="encResultPanel">
+                                <div class="empty-state" id="encWaitingState">
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                    <h5>Menunggu Eksekusi</h5>
+                                </div>
+                                <div class="empty-state d-none" id="encLoadingState">
+                                    <div class="spinner-border text-info mb-3"></div>
+                                    <h5>Mencatat ke Ganache...</h5>
+                                </div>
+                                <div class="d-none" id="encSuccessState">
+                                    <div class="alert alert-success"><i class="fa-solid fa-check me-2"></i> Sukses
+                                        Tersimpan!</div>
+                                    <label class="form-label text-light">Hash Dokumen (SHA-256):</label>
+                                    <div class="result-box text-info" id="encDocHash"></div>
+                                    <a href="#" id="btnDownloadEnc" class="btn-download"><i
+                                            class="fa-solid fa-download me-2"></i> Unduh File (.enc)</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="dec-pane" role="tabpanel">
+                <div class="row g-4 align-items-stretch">
+                    <div class="col-md-6">
+                        <div class="card-custom">
+                            <div class="card-header-purple"><i class="fa-solid fa-unlock-keyhole me-2"></i> Dekripsi &
+                                Verifikasi</div>
+                            <div class="card-body-custom">
+                                <form id="decryptForm">
+                                    <div class="mb-4">
+                                        <label class="form-label">Pilih File Terenkripsi (.enc)</label>
+                                        <input class="form-control" type="file" id="decFileInput" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">Masukkan Kunci</label>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control" id="decKeyInput" required>
+                                            <span class="input-group-text toggle-pwd"><i
+                                                    class="fa-solid fa-eye"></i></span>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn-purple" id="btnSubmitDec"><i
+                                            class="fa-solid fa-magnifying-glass me-2"></i> Verifikasi & Buka</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card-custom">
+                            <div class="card-header-green"><i class="fa-solid fa-shield-check me-2"></i> Hasil
+                                Verifikasi</div>
+                            <div class="card-body-custom" id="decResultPanel">
+                                <div class="empty-state" id="decWaitingState">
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                    <h5>Menunggu Eksekusi</h5>
+                                </div>
+                                <div class="empty-state d-none" id="decLoadingState">
+                                    <div class="spinner-border text-warning mb-3"></div>
+                                    <h5>Mengecek Ganache...</h5>
+                                </div>
+                                <div class="d-none" id="decSuccessState">
+                                    <div class="alert alert-success"><i class="fa-solid fa-certificate me-2"></i>
+                                        DOKUMEN VALID & ASLI!</div>
+                                    <p class="text-light mt-3">Hash dokumen cocok dengan catatan Blockchain. Kunci yang
+                                        dimasukkan juga benar.</p>
+                                    <a href="#" id="btnDownloadDec" class="btn-download bg-success"><i
+                                            class="fa-solid fa-download me-2"></i> Unduh File Asli (.pdf)</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Fitur Mata Password
+        document.querySelectorAll('.toggle-pwd').forEach(item => {
+            item.addEventListener('click', function () {
+                const input = this.previousElementSibling;
+                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                input.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+            });
+        });
+
+        // Logika Form Enkripsi
+        document.getElementById('encryptForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('fileInput').files[0]);
+            formData.append('key', document.getElementById('keyInput').value);
+
+            document.getElementById('btnSubmit').disabled = true;
+            document.getElementById('encWaitingState').classList.add('d-none');
+            document.getElementById('encSuccessState').classList.add('d-none');
+            document.getElementById('encLoadingState').classList.remove('d-none');
+            document.getElementById('ciphertextContainer').classList.add('d-none');
+
+            try {
+                const response = await fetch('/api/encrypt', { method: 'POST', body: formData });
+                const result = await response.json();
+                document.getElementById('encLoadingState').classList.add('d-none');
+
+                if (response.ok) {
+                    // Sukses
+                    document.getElementById('encSuccessState').classList.remove('d-none');
+                    document.getElementById('encDocHash').innerText = result.hash;
+                    document.getElementById('btnDownloadEnc').href = `/download/encrypted/${result.filename}`;
+
+                    // Tampilkan Ciphertext di Kiri
+                    document.getElementById('ciphertextContainer').classList.remove('d-none');
+                    document.getElementById('fullCiphertextOutput').value = result.ciphertext_full;
+
+                    // Reset Input
+                    document.getElementById('fileInput').value = "";
+                    document.getElementById('keyInput').value = "";
+                } else {
+                    alert('Gagal: ' + result.message);
+                    document.getElementById('encWaitingState').classList.remove('d-none');
+                }
+            } catch (error) {
+                alert('Error jaringan');
+                document.getElementById('encLoadingState').classList.add('d-none');
+                document.getElementById('encWaitingState').classList.remove('d-none');
+            }
+            document.getElementById('btnSubmit').disabled = false;
+        });
+
+        // Logika Form Dekripsi
+        document.getElementById('decryptForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('decFileInput').files[0]);
+            formData.append('key', document.getElementById('decKeyInput').value);
+
+            document.getElementById('btnSubmitDec').disabled = true;
+            document.getElementById('decWaitingState').classList.add('d-none');
+            document.getElementById('decSuccessState').classList.add('d-none');
+            document.getElementById('decLoadingState').classList.remove('d-none');
+
+            try {
+                const response = await fetch('/api/decrypt', { method: 'POST', body: formData });
+                const result = await response.json();
+                document.getElementById('decLoadingState').classList.add('d-none');
+
+                if (response.ok) {
+                    document.getElementById('decSuccessState').classList.remove('d-none');
+                    document.getElementById('btnDownloadDec').href = `/download/decrypted/${result.filename}`;
+                    document.getElementById('decryptForm').reset();
+                } else {
+                    alert('Ditolak: ' + result.message);
+                    document.getElementById('decWaitingState').classList.remove('d-none');
+                }
+            } catch (error) {
+                alert('Error jaringan');
+                document.getElementById('decLoadingState').classList.add('d-none');
+                document.getElementById('decWaitingState').classList.remove('d-none');
+            }
+            document.getElementById('btnSubmitDec').disabled = false;
+        });
+    </script>
+</body>
+
+</html>
