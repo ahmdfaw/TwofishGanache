@@ -55,3 +55,5 @@ history.json
 
 # results
 results/
+*.xlsx
+*.excel
