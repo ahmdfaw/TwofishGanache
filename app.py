@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import json
 import hashlib
 import os
-import time  # TAMBAHAN: Modul untuk menghitung waktu komputasi
+import time  
 from datetime import datetime
 from web3 import Web3
 from twofish import Twofish
@@ -15,7 +15,7 @@ app = Flask(__name__)
 ganache_url = "http://127.0.0.1:7545"
 web3 = Web3(Web3.HTTPProvider(ganache_url))
 
-# CONTRACT ADDRESS DARI TRUFFLE MIGRATE
+# CONTRACT ADDRESS TERBARU
 CONTRACT_ADDRESS = "0x5AD8172ED8ac23d970c673666AFad230B7Bbc22a" 
 
 with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
@@ -39,7 +39,9 @@ def load_history():
             return []
     return []
 
-def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename, waktu_enkripsi):
+def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename, 
+                    waktu_enkripsi, ukuran_plaintext, ukuran_ciphertext, 
+                    waktu_penyimpanan, bit_berubah, total_bit):
     history = load_history()
     if not isinstance(history, list):
         history = []
@@ -53,7 +55,12 @@ def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename, w
         "sha_256": doc_hash,
         "tx_hash": tx_hash,
         "enc_filename": enc_filename,
-        "waktu_enkripsi": waktu_enkripsi  # Simpan data waktu ke riwayat json
+        "waktu_enkripsi": waktu_enkripsi,
+        "ukuran_plaintext": ukuran_plaintext,
+        "ukuran_ciphertext": ukuran_ciphertext,
+        "waktu_penyimpanan": waktu_penyimpanan,
+        "bit_berubah": bit_berubah,
+        "total_bit": total_bit
     }
     history.append(new_entry)
     with open(HISTORY_FILE, 'w') as f:
@@ -96,6 +103,9 @@ def api_encrypt():
         key_string = request.form['key']
         file_bytes = file.read()
 
+        # 1. Metrik Ukuran Plaintext
+        ukuran_plaintext = len(file_bytes)
+
         key_bytes = derive_key_sha256(key_string)
         T = Twofish(key_bytes)
         padded_data = pad_data(file_bytes)
@@ -104,19 +114,23 @@ def api_encrypt():
         ciphertext = iv
         prev_block = iv
         
-        # --- MULAI STOPWATCH ENKRIPSI ---
         start_time = time.time()
-        
         for i in range(0, len(padded_data), 16):
             pt_block = padded_data[i:i+16]
             xored_block = bytes(a ^ b for a, b in zip(pt_block, prev_block))
             ct_block = T.encrypt(xored_block)
             ciphertext += ct_block
             prev_block = ct_block
-            
-        # --- STOPWATCH BERHENTI ---
         duration = time.time() - start_time
-        waktu_enkripsi = f"{duration:.4f}" # Format 4 angka di belakang koma (detik)
+        waktu_enkripsi = f"{duration:.4f}"
+
+        # 2. Metrik Ukuran Ciphertext
+        ukuran_ciphertext = len(ciphertext)
+
+        # 3. Metrik Analisis Kriptografi (Hamming Distance)
+        actual_ct = ciphertext[16:] 
+        total_bit = len(padded_data) * 8
+        bit_berubah = sum(bin(b1 ^ b2).count('1') for b1, b2 in zip(padded_data, actual_ct))
 
         hash_ciphertext = hashlib.sha256(ciphertext).hexdigest()
 
@@ -134,7 +148,11 @@ def api_encrypt():
             "filename": enc_filename,
             "original_filename": file.filename,
             "ciphertext_full": ciphertext_full,
-            "waktu_enkripsi": waktu_enkripsi  # Kirim info waktu ke frontend
+            "waktu_enkripsi": waktu_enkripsi,
+            "ukuran_plaintext": ukuran_plaintext,
+            "ukuran_ciphertext": ukuran_ciphertext,
+            "bit_berubah": bit_berubah,
+            "total_bit": total_bit
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -147,17 +165,28 @@ def api_store_blockchain():
         filename = data.get('filename')
         original_filename = data.get('original_filename')
         ciphertext_full = data.get('ciphertext_full')
+        
+        # Ambil data analitik dari frontend
         waktu_enkripsi = data.get('waktu_enkripsi', '0.0000')
+        ukuran_plaintext = data.get('ukuran_plaintext', 0)
+        ukuran_ciphertext = data.get('ukuran_ciphertext', 0)
+        bit_berubah = data.get('bit_berubah', 0)
+        total_bit = data.get('total_bit', 0)
 
         is_exist = contract.functions.verifyDocument(doc_hash).call()
         if is_exist:
              return jsonify({"status": "error", "message": "Dokumen ini sudah ada di Blockchain!"}), 400
 
+        # 4. Metrik Waktu Penyimpanan Blockchain
+        start_storage_time = time.time()
         tx_hash = contract.functions.storeDocument(doc_hash).transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        storage_duration = time.time() - start_storage_time
+        waktu_penyimpanan = f"{storage_duration:.4f}"
 
-        # Simpan ke log tabel riwayat lokal lengkap beserta durasinya
-        save_to_history(original_filename, ciphertext_full, doc_hash, tx_receipt.transactionHash.hex(), filename, waktu_enkripsi)
+        save_to_history(original_filename, ciphertext_full, doc_hash, tx_receipt.transactionHash.hex(), 
+                        filename, waktu_enkripsi, ukuran_plaintext, ukuran_ciphertext, 
+                        waktu_penyimpanan, bit_berubah, total_bit)
 
         return jsonify({
             "status": "success",
@@ -192,9 +221,7 @@ def api_decrypt():
         
         plaintext_padded = b''
         
-        # --- MULAI STOPWATCH DEKRIPSI ---
         start_time = time.time()
-        
         for i in range(0, len(actual_ciphertext), 16):
             ct_block = actual_ciphertext[i:i+16]
             decrypted_block = T.decrypt(ct_block)
@@ -203,8 +230,6 @@ def api_decrypt():
             prev_block = ct_block
             
         plaintext = unpad_data(plaintext_padded)
-        
-        # --- STOPWATCH BERHENTI ---
         duration = time.time() - start_time
         waktu_dekripsi = f"{duration:.4f}"
 
@@ -220,7 +245,7 @@ def api_decrypt():
             "status": "success",
             "message": "Dokumen valid dan berhasil dibuka!",
             "filename": dec_filename,
-            "waktu_dekripsi": waktu_dekripsi  # Kirim info waktu dekripsi ke frontend
+            "waktu_dekripsi": waktu_dekripsi 
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
