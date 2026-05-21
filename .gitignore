@@ -52,3 +52,6 @@ encrypted/
 
 # Project history
 history.json
+
+# results
+results/

@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from web3 import Web3
 from twofish import Twofish
+import openpyxl
 
 app = Flask(__name__)
 
@@ -15,7 +16,7 @@ app = Flask(__name__)
 ganache_url = "http://127.0.0.1:7545"
 web3 = Web3(Web3.HTTPProvider(ganache_url))
 
-# CONTRACT ADDRESS TERBARU
+# CONTRACT ADDRESS DARI TRUFFLE MIGRATE
 CONTRACT_ADDRESS = "0x5AD8172ED8ac23d970c673666AFad230B7Bbc22a" 
 
 with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
@@ -103,7 +104,6 @@ def api_encrypt():
         key_string = request.form['key']
         file_bytes = file.read()
 
-        # 1. Metrik Ukuran Plaintext
         ukuran_plaintext = len(file_bytes)
 
         key_bytes = derive_key_sha256(key_string)
@@ -124,10 +124,8 @@ def api_encrypt():
         duration = time.time() - start_time
         waktu_enkripsi = f"{duration:.4f}"
 
-        # 2. Metrik Ukuran Ciphertext
         ukuran_ciphertext = len(ciphertext)
 
-        # 3. Metrik Analisis Kriptografi (Hamming Distance)
         actual_ct = ciphertext[16:] 
         total_bit = len(padded_data) * 8
         bit_berubah = sum(bin(b1 ^ b2).count('1') for b1, b2 in zip(padded_data, actual_ct))
@@ -166,7 +164,6 @@ def api_store_blockchain():
         original_filename = data.get('original_filename')
         ciphertext_full = data.get('ciphertext_full')
         
-        # Ambil data analitik dari frontend
         waktu_enkripsi = data.get('waktu_enkripsi', '0.0000')
         ukuran_plaintext = data.get('ukuran_plaintext', 0)
         ukuran_ciphertext = data.get('ukuran_ciphertext', 0)
@@ -177,7 +174,6 @@ def api_store_blockchain():
         if is_exist:
              return jsonify({"status": "error", "message": "Dokumen ini sudah ada di Blockchain!"}), 400
 
-        # 4. Metrik Waktu Penyimpanan Blockchain
         start_storage_time = time.time()
         tx_hash = contract.functions.storeDocument(doc_hash).transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
@@ -191,7 +187,8 @@ def api_store_blockchain():
         return jsonify({
             "status": "success",
             "message": "Hash berhasil dikunci di Blockchain",
-            "tx_hash": tx_receipt.transactionHash.hex()
+            "tx_hash": tx_receipt.transactionHash.hex(),
+            "waktu_penyimpanan": waktu_penyimpanan
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -250,6 +247,107 @@ def api_decrypt():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ==========================================
+# RUTE EKSPOR EXCEL TANPA STYLING (VERSI STABIL)
+# ==========================================
+@app.route('/download_excel/<tx_hash>')
+def download_excel(tx_hash):
+    history = load_history()
+    entry = next((item for item in history if item['tx_hash'] == tx_hash), None)
+    
+    if not entry:
+        return "Data tidak ditemukan", 404
+
+    # Pastikan folder reports ada
+    if not os.path.exists('reports'):
+        os.makedirs('reports')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Hasil Analisis"
+    
+    bit_plain = entry.get('ukuran_plaintext', 0) * 8
+    bit_cipher = entry.get('ukuran_ciphertext', 0) * 8
+    bit_compared = entry.get('total_bit', 0)
+    changed_bit = entry.get('bit_berubah', 0)
+    
+    # Hitung persentase langsung (dihindari penggunaan formula Excel)
+    pct = (changed_bit / bit_compared) * 100 if bit_compared > 0 else 0
+        
+    data = [
+        ["Metrik Pengujian", "Nilai"],
+        ["total bit plain", bit_plain],
+        ["total bit cipher", bit_cipher],
+        ["total bit compared", bit_compared],
+        ["changed bit", changed_bit],
+        ["avalanche percent", f"{pct:.2f}%"]
+    ]
+    
+    for row in data:
+        ws.append(row)
+        
+    ws.column_dimensions['A'].width = 24
+    ws.column_dimensions['B'].width = 16
+    
+    filename = f"Avalanche_{entry.get('nama_file').replace('.pdf', '')}.xlsx"
+    filepath = os.path.join('reports', filename)
+    wb.save(filepath)
+    wb.close() # Penting: Menutup workbook untuk melepas lock file
+    
+    return send_file(filepath, as_attachment=True)
+
+# ==========================================
+# RUTE EKSPOR SELURUH RIWAYAT (POLOS)
+# ==========================================
+@app.route('/download_all_history')
+def download_all_history():
+    history = load_history()
+    
+    if not history:
+        return "Data riwayat kosong", 404
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Riwayat Transaksi"
+    
+    # Header kolom sesuai permintaan Anda
+    headers = [
+        "Timestamp", "Nama File", "Size Plaintext (Byte)", "Size Ciphertext (Byte)", 
+        "Waktu Enkripsi (s)", "Waktu Penyimpanan (s)", "Avalanche Percent", 
+        "Tx Hash", "Changed Bit", "Total Bit"
+    ]
+    ws.append(headers)
+    
+    # Mengisi data ke baris-baris berikutnya
+    for entry in history:
+        bit_berubah = entry.get('bit_berubah', 0)
+        total_bit = entry.get('total_bit', 1) # Mencegah pembagian dengan nol
+        pct = (bit_berubah / total_bit) * 100 if total_bit > 0 else 0
+        
+        row = [
+            entry.get('timestamp', '-'),
+            entry.get('nama_file', '-'),
+            entry.get('ukuran_plaintext', 0),
+            entry.get('ukuran_ciphertext', 0),
+            entry.get('waktu_enkripsi', '0.0000'),
+            entry.get('waktu_penyimpanan', '0.0000'),
+            f"{pct:.2f}%",
+            entry.get('tx_hash', '-'),
+            bit_berubah,
+            total_bit
+        ]
+        ws.append(row)
+    
+    # Atur lebar kolom agar rapi
+    for col in range(1, 11):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+    
+    filename = f"Riwayat_Lengkap_Enkripsi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filepath = os.path.join('reports', filename)
+    wb.save(filepath)
+    
+    return send_file(filepath, as_attachment=True)
+
 @app.route('/download/<folder>/<filename>')
 def download_file(folder, filename):
     if folder not in ['encrypted', 'decrypted']:
@@ -259,4 +357,5 @@ def download_file(folder, filename):
 if __name__ == '__main__':
     os.makedirs('encrypted', exist_ok=True)
     os.makedirs('decrypted', exist_ok=True)
+    os.makedirs('reports', exist_ok=True)
     app.run(debug=True, port=5000)
