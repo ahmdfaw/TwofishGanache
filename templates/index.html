@@ -148,6 +148,22 @@
             color: white;
         }
 
+        .btn-store {
+            background-color: #fbbf24;
+            color: #000;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            margin-top: 15px;
+        }
+
+        .btn-store:hover {
+            background-color: #f59e0b;
+            color: #000;
+        }
+
         .empty-state {
             display: flex;
             flex-direction: column;
@@ -176,7 +192,6 @@
             color: #64748b;
         }
 
-        /* Gaya Khusus Tabel Riwayat */
         .table-custom {
             background-color: #152238;
             color: #e2e8f0;
@@ -273,6 +288,15 @@
                                     <i class="fa-solid fa-arrow-left"></i>
                                     <h5>Menunggu Eksekusi</h5>
                                 </div>
+                                <div class="d-none text-center mt-3" id="encReadyToStoreState">
+                                    <div class="alert alert-info"><i class="fa-solid fa-file-shield me-2"></i> Enkripsi
+                                        Selesai!</div>
+                                    <p class="text-light mb-2">Dokumen siap dicatat ke jaringan Ganache.</p>
+                                    <label class="form-label text-light mt-2">Hash Dokumen (SHA-256):</label>
+                                    <div class="result-box text-info" id="encReadyDocHash"></div>
+                                    <button class="btn-store" id="btnProcessBlockchain"><i
+                                            class="fa-solid fa-cloud-arrow-up me-2"></i> Simpan ke Blockchain</button>
+                                </div>
                                 <div class="empty-state d-none" id="encLoadingState">
                                     <div class="spinner-border text-info mb-3"></div>
                                     <h5>Mencatat ke Ganache...</h5>
@@ -280,10 +304,10 @@
                                 <div class="d-none" id="encSuccessState">
                                     <div class="alert alert-success"><i class="fa-solid fa-check me-2"></i> Sukses
                                         Tersimpan!</div>
-                                    <label class="form-label text-light">Hash Dokumen (SHA-256):</label>
-                                    <div class="result-box text-info" id="encDocHash"></div>
-                                    <a href="#" id="btnDownloadEnc" class="btn-download"><i
-                                            class="fa-solid fa-download me-2"></i> Unduh File (.enc)</a>
+                                    <label class="form-label text-light">Tx Hash Ganache:</label>
+                                    <div class="result-box text-success" id="encTxHash"></div>
+                                    <a href="#" id="btnDownloadEnc" class="btn-download w-100 text-center"><i
+                                            class="fa-solid fa-download me-2"></i> Unduh File Terenkripsi (.enc)</a>
                                 </div>
                             </div>
                         </div>
@@ -335,7 +359,7 @@
                                         DOKUMEN VALID & ASLI!</div>
                                     <p class="text-light mt-3">Hash dokumen cocok dengan catatan Blockchain. Kunci yang
                                         dimasukkan juga benar.</p>
-                                    <a href="#" id="btnDownloadDec" class="btn-download bg-success"><i
+                                    <a href="#" id="btnDownloadDec" class="btn-download bg-success w-100 text-center"><i
                                             class="fa-solid fa-download me-2"></i> Unduh File Asli (.pdf)</a>
                                 </div>
                             </div>
@@ -364,8 +388,7 @@
                                         <th style="width: 10%" class="text-center">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody id="historyTableBody">
-                                </tbody>
+                                <tbody id="historyTableBody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -376,7 +399,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fungsi memuat riwayat transaksi lokal dari backend
+        // Variabel Global untuk menyimpan data sementara sebelum dikirim ke Ganache
+        let tempEncryptionData = {};
+
         async function loadHistoryTable() {
             try {
                 const response = await fetch('/api/history');
@@ -390,7 +415,6 @@
                 }
 
                 data.forEach((item, index) => {
-                    // Potong string panjang agar tabel tidak melar kesamping berlebihan
                     const shortCipher = item.ciphertext.substring(0, 15) + '...';
                     const shortSha = item.sha_256.substring(0, 15) + '...';
                     const shortTx = item.tx_hash.substring(0, 15) + '...';
@@ -411,15 +435,10 @@
                 `;
                     tbody.insertAdjacentHTML('beforeend', row);
                 });
-            } catch (error) {
-                console.error('Gagal memuat tabel riwayat:', error);
-            }
+            } catch (error) { console.error('Gagal memuat tabel riwayat:', error); }
         }
-
-        // Panggil tabel riwayat saat halaman pertama kali dibuka
         document.addEventListener('DOMContentLoaded', loadHistoryTable);
 
-        // Fitur Mata Password
         document.querySelectorAll('.toggle-pwd').forEach(item => {
             item.addEventListener('click', function () {
                 const input = this.previousElementSibling;
@@ -429,7 +448,7 @@
             });
         });
 
-        // Logika Form Enkripsi
+        // TAHAP 1: FORM ENKRIPSI
         document.getElementById('encryptForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const formData = new FormData();
@@ -437,42 +456,80 @@
             formData.append('key', document.getElementById('keyInput').value);
 
             document.getElementById('btnSubmit').disabled = true;
+
+            // Reset Layar Kanan
             document.getElementById('encWaitingState').classList.add('d-none');
             document.getElementById('encSuccessState').classList.add('d-none');
-            document.getElementById('encLoadingState').classList.remove('d-none');
+            document.getElementById('encReadyToStoreState').classList.add('d-none');
             document.getElementById('ciphertextContainer').classList.add('d-none');
 
             try {
                 const response = await fetch('/api/encrypt', { method: 'POST', body: formData });
                 const result = await response.json();
-                document.getElementById('encLoadingState').classList.add('d-none');
 
                 if (response.ok) {
-                    document.getElementById('encSuccessState').classList.remove('d-none');
-                    document.getElementById('encDocHash').innerText = result.hash;
-                    document.getElementById('btnDownloadEnc').href = `/download/encrypted/${result.filename}`;
+                    // Simpan data di memori browser sementara
+                    tempEncryptionData = result;
 
+                    // Tampilkan Tinjauan Manual (Tombol Simpan Ganache)
+                    document.getElementById('encReadyToStoreState').classList.remove('d-none');
+                    document.getElementById('encReadyDocHash').innerText = result.hash;
+
+                    // Tampilkan Ciphertext di Kiri
                     document.getElementById('ciphertextContainer').classList.remove('d-none');
                     document.getElementById('fullCiphertextOutput').value = result.ciphertext_full;
 
-                    document.getElementById('fileInput').value = "";
-                    document.getElementById('keyInput').value = "";
-
-                    // Segera update isi tabel riwayat secara langsung (real-time)
-                    loadHistoryTable();
                 } else {
-                    alert('Gagal: ' + result.message);
+                    alert('Gagal Enkripsi: ' + result.message);
                     document.getElementById('encWaitingState').classList.remove('d-none');
                 }
             } catch (error) {
                 alert('Error jaringan');
-                document.getElementById('encLoadingState').classList.add('d-none');
                 document.getElementById('encWaitingState').classList.remove('d-none');
             }
             document.getElementById('btnSubmit').disabled = false;
         });
 
-        // Logika Form Dekripsi
+        // TAHAP 2: TOMBOL SIMPAN KE BLOCKCHAIN
+        document.getElementById('btnProcessBlockchain').addEventListener('click', async function () {
+            this.disabled = true;
+            document.getElementById('encReadyToStoreState').classList.add('d-none');
+            document.getElementById('encLoadingState').classList.remove('d-none');
+
+            try {
+                const response = await fetch('/api/store_blockchain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tempEncryptionData)
+                });
+                const result = await response.json();
+
+                document.getElementById('encLoadingState').classList.add('d-none');
+
+                if (response.ok) {
+                    document.getElementById('encSuccessState').classList.remove('d-none');
+                    document.getElementById('encTxHash').innerText = result.tx_hash;
+                    document.getElementById('btnDownloadEnc').href = `/download/encrypted/${tempEncryptionData.filename}`;
+
+                    // Reset form input
+                    document.getElementById('fileInput').value = "";
+                    document.getElementById('keyInput').value = "";
+
+                    // Perbarui Tabel
+                    loadHistoryTable();
+                } else {
+                    alert('Ditolak Ganache: ' + result.message);
+                    document.getElementById('encReadyToStoreState').classList.remove('d-none');
+                }
+            } catch (error) {
+                alert('Error jaringan Ganache');
+                document.getElementById('encLoadingState').classList.add('d-none');
+                document.getElementById('encReadyToStoreState').classList.remove('d-none');
+            }
+            this.disabled = false;
+        });
+
+        // TAHAP 3: FORM DEKRIPSI
         document.getElementById('decryptForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const formData = new FormData();
