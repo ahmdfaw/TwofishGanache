@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, send_file
 import json
 import hashlib
 import os
+import time  # TAMBAHAN: Modul untuk menghitung waktu komputasi
+from datetime import datetime
 from web3 import Web3
 from twofish import Twofish
 
@@ -14,7 +16,7 @@ ganache_url = "http://127.0.0.1:7545"
 web3 = Web3(Web3.HTTPProvider(ganache_url))
 
 # CONTRACT ADDRESS DARI TRUFFLE MIGRATE
-CONTRACT_ADDRESS = "0xd60e68381c1D6Ab012AA4fD409E6D049c90a6945" 
+CONTRACT_ADDRESS = "0x5AD8172ED8ac23d970c673666AFad230B7Bbc22a" 
 
 with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
     contract_json = json.load(file)
@@ -26,7 +28,7 @@ web3.eth.default_account = web3.eth.accounts[0]
 HISTORY_FILE = 'history.json'
 
 # ==========================================
-# FUNGSI MANAJEMEN RIWAYAT
+# FUNGSI MANAJEMEN RIWAYAT (JSON LOKAL)
 # ==========================================
 def load_history():
     if os.path.exists(HISTORY_FILE):
@@ -37,17 +39,21 @@ def load_history():
             return []
     return []
 
-def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename):
+def save_to_history(filename, ciphertext_hex, doc_hash, tx_hash, enc_filename, waktu_enkripsi):
     history = load_history()
     if not isinstance(history, list):
         history = []
     
+    waktu_sekarang = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     new_entry = {
+        "timestamp": waktu_sekarang,
         "nama_file": filename,
         "ciphertext": ciphertext_hex,
         "sha_256": doc_hash,
         "tx_hash": tx_hash,
-        "enc_filename": enc_filename
+        "enc_filename": enc_filename,
+        "waktu_enkripsi": waktu_enkripsi  # Simpan data waktu ke riwayat json
     }
     history.append(new_entry)
     with open(HISTORY_FILE, 'w') as f:
@@ -80,7 +86,6 @@ def index():
 def get_history():
     return jsonify(load_history())
 
-# API 1: HANYA UNTUK ENKRIPSI LOKAL
 @app.route('/api/encrypt', methods=['POST'])
 def api_encrypt():
     try:
@@ -99,12 +104,19 @@ def api_encrypt():
         ciphertext = iv
         prev_block = iv
         
+        # --- MULAI STOPWATCH ENKRIPSI ---
+        start_time = time.time()
+        
         for i in range(0, len(padded_data), 16):
             pt_block = padded_data[i:i+16]
             xored_block = bytes(a ^ b for a, b in zip(pt_block, prev_block))
             ct_block = T.encrypt(xored_block)
             ciphertext += ct_block
             prev_block = ct_block
+            
+        # --- STOPWATCH BERHENTI ---
+        duration = time.time() - start_time
+        waktu_enkripsi = f"{duration:.4f}" # Format 4 angka di belakang koma (detik)
 
         hash_ciphertext = hashlib.sha256(ciphertext).hexdigest()
 
@@ -121,12 +133,12 @@ def api_encrypt():
             "hash": hash_ciphertext,
             "filename": enc_filename,
             "original_filename": file.filename,
-            "ciphertext_full": ciphertext_full
+            "ciphertext_full": ciphertext_full,
+            "waktu_enkripsi": waktu_enkripsi  # Kirim info waktu ke frontend
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# API 2: KHUSUS UNTUK MENYIMPAN KE BLOCKCHAIN GANACHE
 @app.route('/api/store_blockchain', methods=['POST'])
 def api_store_blockchain():
     try:
@@ -135,8 +147,8 @@ def api_store_blockchain():
         filename = data.get('filename')
         original_filename = data.get('original_filename')
         ciphertext_full = data.get('ciphertext_full')
+        waktu_enkripsi = data.get('waktu_enkripsi', '0.0000')
 
-        # Interaksi dengan Ganache
         is_exist = contract.functions.verifyDocument(doc_hash).call()
         if is_exist:
              return jsonify({"status": "error", "message": "Dokumen ini sudah ada di Blockchain!"}), 400
@@ -144,8 +156,8 @@ def api_store_blockchain():
         tx_hash = contract.functions.storeDocument(doc_hash).transact()
         tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 
-        # Simpan ke tabel riwayat setelah sukses dicatat di blockchain
-        save_to_history(original_filename, ciphertext_full, doc_hash, tx_receipt.transactionHash.hex(), filename)
+        # Simpan ke log tabel riwayat lokal lengkap beserta durasinya
+        save_to_history(original_filename, ciphertext_full, doc_hash, tx_receipt.transactionHash.hex(), filename, waktu_enkripsi)
 
         return jsonify({
             "status": "success",
@@ -179,6 +191,10 @@ def api_decrypt():
         prev_block = iv
         
         plaintext_padded = b''
+        
+        # --- MULAI STOPWATCH DEKRIPSI ---
+        start_time = time.time()
+        
         for i in range(0, len(actual_ciphertext), 16):
             ct_block = actual_ciphertext[i:i+16]
             decrypted_block = T.decrypt(ct_block)
@@ -187,6 +203,10 @@ def api_decrypt():
             prev_block = ct_block
             
         plaintext = unpad_data(plaintext_padded)
+        
+        # --- STOPWATCH BERHENTI ---
+        duration = time.time() - start_time
+        waktu_dekripsi = f"{duration:.4f}"
 
         if not plaintext.startswith(b'%PDF-'):
             return jsonify({"status": "error", "message": "Kunci Salah atau File Rusak!"}), 400
@@ -199,7 +219,8 @@ def api_decrypt():
         return jsonify({
             "status": "success",
             "message": "Dokumen valid dan berhasil dibuka!",
-            "filename": dec_filename
+            "filename": dec_filename,
+            "waktu_dekripsi": waktu_dekripsi  # Kirim info waktu dekripsi ke frontend
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
