@@ -609,9 +609,12 @@
             const item = window.historyCache[index];
             if (!item) return;
 
+            const plainKB = (item.ukuran_plaintext || 0) / 1024;
+            const cipherKB = (item.ukuran_ciphertext || 0) / 1024;
+
             document.getElementById('mdFilename').innerText = item.nama_file;
-            document.getElementById('mdPlainSize').innerText = (item.ukuran_plaintext || 0).toLocaleString() + " Byte";
-            document.getElementById('mdCipherSize').innerText = (item.ukuran_ciphertext || 0).toLocaleString() + " Byte";
+            document.getElementById('mdPlainSize').innerText = plainKB.toFixed(2) + " KB";
+            document.getElementById('mdCipherSize').innerText = cipherKB.toFixed(2) + " KB";
             document.getElementById('mdEncTime').innerText = (item.waktu_enkripsi || "0.0000") + " Detik";
             document.getElementById('mdStorageTime').innerText = (item.waktu_penyimpanan || "0.0000") + " Detik";
 
