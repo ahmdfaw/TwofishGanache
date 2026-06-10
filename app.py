@@ -5,7 +5,7 @@ import os
 import time  
 from datetime import datetime
 from web3 import Web3
-from twofish import Twofish
+from twofish_manual import Twofish
 import openpyxl
 
 app = Flask(__name__)
@@ -17,7 +17,7 @@ ganache_url = "http://127.0.0.1:7545"
 web3 = Web3(Web3.HTTPProvider(ganache_url))
 
 # CONTRACT ADDRESS DARI TRUFFLE MIGRATE
-CONTRACT_ADDRESS = "0x5AD8172ED8ac23d970c673666AFad230B7Bbc22a" 
+CONTRACT_ADDRESS = "0xE2bEFB28b75dB37C3ad6053C4dB65d4e31c75A2D" 
 
 with open('blockchain/build/contracts/DocumentRegistry.json', 'r') as file:
     contract_json = json.load(file)
