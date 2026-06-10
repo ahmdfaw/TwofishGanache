@@ -374,6 +374,12 @@
                                     <i class="fa-solid fa-arrow-left"></i>
                                     <h5>Menunggu Eksekusi</h5>
                                 </div>
+                                <div class="empty-state d-none" id="encProcessingState">
+                                    <div class="spinner-border text-info mb-3" style="width: 3rem; height: 3rem;"></div>
+                                    <h5>Memproses Enkripsi Twofish...</h5>
+                                    <p class="text-muted small mt-2">Mohon tunggu, proses matematika sedang berjalan.
+                                    </p>
+                                </div>
                                 <div class="d-none text-center mt-2" id="encReadyToStoreState">
                                     <div class="alert alert-info py-2"><i class="fa-solid fa-file-shield me-2"></i>
                                         Enkripsi Selesai!</div>
@@ -448,8 +454,11 @@
                                     <h5>Menunggu Eksekusi</h5>
                                 </div>
                                 <div class="empty-state d-none" id="decLoadingState">
-                                    <div class="spinner-border text-warning mb-3"></div>
-                                    <h5>Mengecek Ganache...</h5>
+                                    <div class="spinner-border text-warning mb-3" style="width: 3rem; height: 3rem;">
+                                    </div>
+                                    <h5>Verifikasi & Memproses Dekripsi...</h5>
+                                    <p class="text-muted small mt-2">Mencocokkan Blockchain dan membalikkan algoritma.
+                                    </p>
                                 </div>
                                 <div class="d-none" id="decSuccessState">
                                     <div class="alert alert-success py-2"><i class="fa-solid fa-certificate me-2"></i>
@@ -649,10 +658,13 @@
             document.getElementById('encSuccessState').classList.add('d-none');
             document.getElementById('encReadyToStoreState').classList.add('d-none');
             document.getElementById('ciphertextContainer').classList.add('d-none');
+            document.getElementById('encProcessingState').classList.remove('d-none');
 
             try {
                 const response = await fetch('/api/encrypt', { method: 'POST', body: formData });
                 const result = await response.json();
+
+                document.getElementById('encProcessingState').classList.add('d-none');
 
                 if (response.ok) {
                     tempEncryptionData = result;
